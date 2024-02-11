@@ -2,16 +2,42 @@ import pytest
 from mrwhisker.main import render
 
 
-def test_render_string():
-    assert render("I'm Mr. Whisker") == "I'm Mr. Whisker"
+class TestRenderTemplate:
+    def test_string(self):
+        assert render("I'm Mr. Whisker") == "I'm Mr. Whisker"
+
+    def test_file(self):
+        expected = "<h1>Mr. Whisker</h1>\n<p>another mustache implementation</p>"
+        with open("tests/test.html") as html:
+            assert render(html) == expected
+
+    def test_raise_error_when_template_not_string_or_file(self):
+        with pytest.raises(TypeError) as e:
+            render(123)
+        assert str(e.value) == "Template must be of type string or TextIOWrapper"
 
 
-def test_render_html():
-    with open("tests/test.html") as html:
-        assert render(html) == "<h1>Mr. Whisker</h1>"
+class TestRenderData:
+    def test_when_data_is_None_renders_empty_string(self):
+        template = "Hello {{world}}"
+        assert render(template) == "Hello "
+    
+    def test_when_data_is_empty_dict_renders_empty_string(self):
+        template = "Hello {{world}}"
+        assert render(template, {}) == "Hello "
+    
+    def test_when_data_is_whitespace_renders_empty_string(self):
+        template = "Hello {{world}}"
+        assert render(template, "\n") == "Hello "
 
+    def test_render_variable(self):
+        template = "Hello {{ var }}"
+        data = "world"
+        expected = "Hello world"
+        assert render(template, data) == expected
 
-def test_raise_error_template_not_string_or_file():
-    with pytest.raises(TypeError) as e:
-        render(123)
-    assert str(e.value) == "Template must be a string or file object"
+    def test_render_duplicate_variables(self):
+        template = "{{ v }} {{ v}} {{v}} {{v }} world"
+        data = "hey"
+        expected = "hey hey hey hey world"
+        assert render(template, data) == expected
