@@ -26,6 +26,14 @@ def render(template: Union[str, TextIOWrapper], data: str = None) -> str:
     if isinstance(data, str) and data.isspace():
         data = ''
 
-    template = re.sub(r'{{\s*(\w+)\s*}}', data, template)
+    if isinstance(data, str):
+        template = re.sub(r'{{\s*(\w+)\s*}}', data, template)
 
+    tokens = set(re.findall(r'{{\s*(\w+)\s*}}', template))
+
+    if data and isinstance(data, dict):
+      tokens.update(data.keys())
+      for token in tokens:
+          value = data.get(token, '')
+          template = re.sub(r'{{\s*%s\s*}}' % token, value, template)
     return template

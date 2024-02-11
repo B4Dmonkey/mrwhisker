@@ -21,11 +21,11 @@ class TestRenderData:
     def test_when_data_is_None_renders_empty_string(self):
         template = "Hello {{world}}"
         assert render(template) == "Hello "
-    
+
     def test_when_data_is_empty_dict_renders_empty_string(self):
         template = "Hello {{world}}"
         assert render(template, {}) == "Hello "
-    
+
     def test_when_data_is_whitespace_renders_empty_string(self):
         template = "Hello {{world}}"
         assert render(template, "\n") == "Hello "
@@ -40,4 +40,16 @@ class TestRenderData:
         template = "{{ v }} {{ v}} {{v}} {{v }} world"
         data = "hey"
         expected = "hey hey hey hey world"
+        assert render(template, data) == expected
+
+    def test_when_data_dict_render_variable(self):
+        template = "Hello, {{ Adele }}"
+        data = {"Adele": "it's me"}
+        expected = "Hello, it's me"
+        assert render(template, data) == expected
+
+    def test_dict_keys_are_case_sensitive(self):
+        template = "Hello, {{ Adele }}"
+        data = {"adele": "it's me"}
+        expected = "Hello, "
         assert render(template, data) == expected
