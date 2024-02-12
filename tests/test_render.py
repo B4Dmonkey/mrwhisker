@@ -18,6 +18,11 @@ class TestRenderTemplate:
 
 
 class TestRenderData:
+    def test_data_is_str_or_dict(self):
+        with pytest.raises(TypeError) as e:
+            render("Hello {{world}}", 123)
+        assert str(e.value) == "Data must be of type string or dict"
+
     def test_when_data_is_None_renders_empty_string(self):
         template = "Hello {{world}}"
         assert render(template) == "Hello "
