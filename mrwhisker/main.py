@@ -1,7 +1,7 @@
 import re
 import html
 from enum import Enum
-from typing import Union
+from typing import Union, List, Tuple, Generator
 from io import TextIOWrapper
 
 
@@ -16,11 +16,9 @@ def render(template: Union[str, TextIOWrapper], data: Union[str, dict] = '') -> 
     Returns:
     str: The rendered template.
     """
-    if not isinstance(template, (str, TextIOWrapper)):
-        raise TypeError("Template must be of type string or TextIOWrapper")
-
-    if not isinstance(data, (str, dict)):
-        raise TypeError("Data must be of type string or dict")
+    assert isinstance(template, (str, TextIOWrapper)
+                      ), "Template must be of type string or TextIOWrapper"
+    assert isinstance(data, (str, dict)), "Data must be of type string or dict"
 
     if not data or isinstance(data, str) and data.isspace():
         data = ''
@@ -32,55 +30,67 @@ def render(template: Union[str, TextIOWrapper], data: Union[str, dict] = '') -> 
         return re.sub(r'{{\s*(\w+)\s*}}', data, template)
 
     # * Find all the tokens in the template
-    tokens = parse_tokens(template, data)
+    tokens = tokenize(template, data)
 
-    if data and isinstance(data, dict):
-        for token in tokens:
-            # * If the token is not in the template, remove it from the template
-            if not bool(re.search(token.key, template)):
-                template = re.sub(token.key, '', template)
-                continue
-
-            value = token.value
-
-            if token.token_type == TokenType.VARIABLE:
-                value = html.escape(token.value, quote=False)
-
-            template = re.sub(token.key, value, template)
+    for token in tokens:
+        template = token.eval(template)
 
     return template
+    # tokens, template = match_tokens(template, data)
+
+    # if data and isinstance(data, dict):
+    #     for token in tokens:
+    #         # * If the token is not in the template, remove it from the template
+    #         if not bool(re.search(token.key, template)):
+    #             template = re.sub(token.key, '', template)
+    #             continue
+
+    #         value = token.value
+
+    #         if token.type == TokenType.VARIABLE:
+    #             value = html.escape(value, quote=False)
+
+    #         # ! need to fix the matching here
+    #         template = template.replace(token.key, value)
+
+    # return template
 
 
-def parse_tokens(template: str, data: Union[str, dict]) -> set:
-    VARIABLE_TOKEN_MATCHER = r'{{\s*(\w+)\s*}}'
-    RAW_HTML_TOKEN_MATCHER = r'{{{\s*(\w+)\s*}}}'
+# TOKEN_MATCHER = r'({{2,3}\s*.*?\s*}{2,3})'
+TOKEN_MATCHER = r'({{2,3}\s*\S*?\s*}{2,3})'
 
+
+def match_tokens(template: str, data: Union[str, dict]) -> Tuple[List, str]:
     tokens = []
 
-    for match in re.finditer(RAW_HTML_TOKEN_MATCHER, template):
-        FIRST_WORD = 1
-        token_key = match.group(FIRST_WORD)
+    def remove_spaces(match):
+        return match.group(1) + match.group(2).strip() + match.group(3)
+
+    for match in re.finditer(TOKEN_MATCHER, template):
+        token_match = match.group()
+        template = re.sub(r'({{2,3}&?)\s*(.*?)\s*(}{2,3})',
+                          remove_spaces, template)
+
+        token_key = re.sub(r'\s+', '', token_match)
+        # ! This feels wrong
+        unwanted_chars = "{ s* & } \\"
+        token_name = ''.join(c for c in token_key if c not in unwanted_chars)
+
+        if data and isinstance(data, dict):
+            value = data.get(token_name, '')
+
+        if not data or isinstance(data, str):
+            value = data
         tokens.append(
-            Token(
-                key=token_key,
-                value=data.get(token_key, '') if isinstance(
-                    data, dict) else data,
-                token_type=TokenType.RAW_HTML
-            )
+            Token(key=token_key, value=value)
         )
 
-    for match in re.finditer(VARIABLE_TOKEN_MATCHER, template):
-        FIRST_WORD = 1
-        token_key = match.group(FIRST_WORD)
-        tokens.append(
-            Token(
-                key=token_key,
-                value=data.get(token_key, '') if isinstance(
-                    data, dict) else data
-            )
-        )
+    return tokens, template
 
-    return tokens
+
+VARIABLE_TOKEN_MATCHER = r'{{\s*(\w+)\s*}}'
+# RAW_HTML_TOKEN_MATCHER = r'{{{\s*(\w*)\s*}}}|{{&\s*(\w*)\s*}}'
+RAW_HTML_TOKEN_MATCHER = r'{{{\s*.*\s*}}}|{{&\s*.*\s*}}'
 
 
 class TokenType(Enum):
@@ -89,10 +99,9 @@ class TokenType(Enum):
 
 
 class Token:
-    def __init__(self, key: str, value: str = None, token_type: TokenType = TokenType.VARIABLE):
+    def __init__(self, key: str, value: str = None):
         self._key = key
         self._value = value
-        self.token_type = token_type
 
     def __eq__(self, other):
         if isinstance(other, Token):
@@ -101,14 +110,41 @@ class Token:
 
     @property
     def key(self):
-        match self.token_type:
-            case TokenType.VARIABLE:
-                return r'{{\s*%s\s*}}' % self._key
-            case TokenType.RAW_HTML:
-                return r'{{{\s*%s\s*}}}' % self._key
-            case _:
-                raise ValueError("Invalid token type")
+        return self._key
 
     @property
     def value(self):
         return self._value if self._value else ''
+
+    @property
+    def type(self):
+        match self.key:
+            case str() if re.match(r'{{{\s*.*\s*}}}|{{&\s*.*\s*}}', self.key):
+                return TokenType.RAW_HTML
+            case  str() if re.match(r'{{\s*.*\s*}}', self.key):
+                return TokenType.VARIABLE
+            case _:
+                raise ValueError("Invalid token type")
+
+
+class Tooken:
+    def __init__(self, key: str, value: str):
+        self._key = key
+        self._value = value
+
+    def eval(self, template: str) -> str:
+        return template.replace(self._key, self._value)
+
+
+def tokenize(template: str, data: dict) -> Generator[Tooken, None, None]:
+    tokens = []
+    for match in re.finditer(TOKEN_MATCHER, template):
+        token_match = match.group()
+        token_var = token_match.strip('{}')
+        token_value = data.get(token_var, '')
+        tokens.append(
+            Tooken(key=token_match, value=token_value)
+        )
+
+    for token in tokens:
+        yield token
