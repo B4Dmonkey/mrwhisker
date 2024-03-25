@@ -136,6 +136,16 @@ class Token:
         return template.replace(self._key, self._value)
 
 
+def has_triple_mustache(value: str) -> bool:
+    """
+    Checks if a value has triple mustache
+    Args:
+    value (str): The value to check
+    return (bool): True if the value has triple mustache, False otherwise
+    """
+    return '{{{' in value and '}}}' in value
+
+
 def tokenize(template: str, data: dict) -> Generator[Token, None, None]:
     tokens = []
     for match in re.finditer(TOKEN_MATCHER, template):
@@ -143,7 +153,8 @@ def tokenize(template: str, data: dict) -> Generator[Token, None, None]:
         token_var = token_match.strip('{}')
         token_value = data.get(token_var, '')
         # * escape html characters
-        token_value = html.escape(token_value)
+        if not has_triple_mustache(token_match):
+            token_value = html.escape(token_value)
         tokens.append(
             Token(key=token_match, value=token_value)
         )
