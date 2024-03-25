@@ -142,6 +142,8 @@ def tokenize(template: str, data: dict) -> Generator[Token, None, None]:
         token_match = match.group()
         token_var = token_match.strip('{}')
         token_value = data.get(token_var, '')
+        # * escape html characters
+        token_value = html.escape(token_value)
         tokens.append(
             Token(key=token_match, value=token_value)
         )
