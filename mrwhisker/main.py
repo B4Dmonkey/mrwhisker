@@ -60,32 +60,32 @@ def render(template: Union[str, TextIOWrapper], data: Union[str, dict] = '') -> 
 TOKEN_MATCHER = r'({{2,3}\s*\S*?\s*}{2,3})'
 
 
-def match_tokens(template: str, data: Union[str, dict]) -> Tuple[List, str]:
-    tokens = []
+# def match_tokens(template: str, data: Union[str, dict]) -> Tuple[List, str]:
+#     tokens = []
 
-    def remove_spaces(match):
-        return match.group(1) + match.group(2).strip() + match.group(3)
+#     def remove_spaces(match):
+#         return match.group(1) + match.group(2).strip() + match.group(3)
 
-    for match in re.finditer(TOKEN_MATCHER, template):
-        token_match = match.group()
-        template = re.sub(r'({{2,3}&?)\s*(.*?)\s*(}{2,3})',
-                          remove_spaces, template)
+#     for match in re.finditer(TOKEN_MATCHER, template):
+#         token_match = match.group()
+#         template = re.sub(r'({{2,3}&?)\s*(.*?)\s*(}{2,3})',
+#                           remove_spaces, template)
 
-        token_key = re.sub(r'\s+', '', token_match)
-        # ! This feels wrong
-        unwanted_chars = "{ s* & } \\"
-        token_name = ''.join(c for c in token_key if c not in unwanted_chars)
+#         token_key = re.sub(r'\s+', '', token_match)
+#         # ! This feels wrong
+#         unwanted_chars = "{ s* & } \\"
+#         token_name = ''.join(c for c in token_key if c not in unwanted_chars)
 
-        if data and isinstance(data, dict):
-            value = data.get(token_name, '')
+#         if data and isinstance(data, dict):
+#             value = data.get(token_name, '')
 
-        if not data or isinstance(data, str):
-            value = data
-        tokens.append(
-            Token(key=token_key, value=value)
-        )
+#         if not data or isinstance(data, str):
+#             value = data
+#         tokens.append(
+#             Token(key=token_key, value=value)
+#         )
 
-    return tokens, template
+#     return tokens, template
 
 
 VARIABLE_TOKEN_MATCHER = r'{{\s*(\w+)\s*}}'
@@ -98,36 +98,36 @@ class TokenType(Enum):
     RAW_HTML = 'raw_html'
 
 
+# class Token:
+#     def __init__(self, key: str, value: str = None):
+#         self._key = key
+#         self._value = value
+
+#     def __eq__(self, other):
+#         if isinstance(other, Token):
+#             return self.key == other.key
+#         return False
+
+#     @property
+#     def key(self):
+#         return self._key
+
+#     @property
+#     def value(self):
+#         return self._value if self._value else ''
+
+#     @property
+#     def type(self):
+#         match self.key:
+#             case str() if re.match(r'{{{\s*.*\s*}}}|{{&\s*.*\s*}}', self.key):
+#                 return TokenType.RAW_HTML
+#             case  str() if re.match(r'{{\s*.*\s*}}', self.key):
+#                 return TokenType.VARIABLE
+#             case _:
+#                 raise ValueError("Invalid token type")
+
+
 class Token:
-    def __init__(self, key: str, value: str = None):
-        self._key = key
-        self._value = value
-
-    def __eq__(self, other):
-        if isinstance(other, Token):
-            return self.key == other.key
-        return False
-
-    @property
-    def key(self):
-        return self._key
-
-    @property
-    def value(self):
-        return self._value if self._value else ''
-
-    @property
-    def type(self):
-        match self.key:
-            case str() if re.match(r'{{{\s*.*\s*}}}|{{&\s*.*\s*}}', self.key):
-                return TokenType.RAW_HTML
-            case  str() if re.match(r'{{\s*.*\s*}}', self.key):
-                return TokenType.VARIABLE
-            case _:
-                raise ValueError("Invalid token type")
-
-
-class Tooken:
     def __init__(self, key: str, value: str):
         self._key = key
         self._value = value
@@ -136,14 +136,14 @@ class Tooken:
         return template.replace(self._key, self._value)
 
 
-def tokenize(template: str, data: dict) -> Generator[Tooken, None, None]:
+def tokenize(template: str, data: dict) -> Generator[Token, None, None]:
     tokens = []
     for match in re.finditer(TOKEN_MATCHER, template):
         token_match = match.group()
         token_var = token_match.strip('{}')
         token_value = data.get(token_var, '')
         tokens.append(
-            Tooken(key=token_match, value=token_value)
+            Token(key=token_match, value=token_value)
         )
 
     for token in tokens:
