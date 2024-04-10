@@ -3,7 +3,6 @@ import html
 from enum import Enum
 from typing import Union, Generator
 from io import TextIOWrapper
-
 RAW_HTML_TOKEN_MATCHER = r'{{{\s*.*\s*}}}|{{&\s*.*\s*}}'
 
 
@@ -29,10 +28,10 @@ def render(template: Union[str, TextIOWrapper], data: Union[str, dict] = '') -> 
         template = template.read()
 
     # * Find all the tokens in the template
-    tokens = tokenize(template, data)
-
-    for token in tokens:
-        template = token.eval(template)
+    token_stack = [token for token in tokenize(template)]
+    while token_stack:
+        token = token_stack.pop()
+        template = eval_template(template, token, data)
 
     return template
 
@@ -46,17 +45,16 @@ VARIABLE_TOKEN_MATCHER = r'{{\s*(\w+)\s*}}'
 
 
 class TokenType(Enum):
-    VARIABLE = 'variable'
+    INTERPOLATION = 'variable'
     RAW_HTML = 'raw_html'
+    SECTION = 'section'
 
 
 class Token:
-    def __init__(self, key: str, value: str):
-        self._key = key
-        self._value = value
-
-    def eval(self, template: str) -> str:
-        return template.replace(self._key, self._value)
+    def __init__(self, match: str, key: str,  token_type: TokenType = TokenType.INTERPOLATION):
+        self.match = match
+        self.key = key
+        self._type = token_type
 
 
 def has_triple_mustache(value: str) -> bool:
@@ -93,28 +91,45 @@ def is_html_escape(value: str) -> bool:
     return True
 
 
-def tokenize(template: str, data: Union[str, dict]) -> Generator[Token, None, None]:
-    tokens = []
+def get_value(key: str, data: Union[str, dict]) -> str:
+    """
+    Get the value of a key from the data
+    Args:
+    key (str): The key to get the value for
+    data (str, dict): The data to get the value from
+    return (str): The value of the key
+    """
+    if isinstance(data, str):
+        return data
+
+    dotted_keys = key.split('.')
+    if len(dotted_keys) > 1:
+        value = data
+        for k in dotted_keys:
+            # ? should an error be raised if the key is not found ?
+            value = value.get(k, '')
+        return value
+    return data.get(key, '')
+
+
+def tokenize(template: str) -> Generator[Token, None, None]:
     for match in re.finditer(TOKEN_MATCHER, template):
         token_match = match.group()
         token_var = token_match.strip('{&}')
-        token_value = data if isinstance(
-            data, str) else data.get(token_var, '')
+        yield Token(match=token_match, key=token_var)
 
-        if not token_value:
-            token_value = ''
 
-        # * convert int to string
-        if isinstance(token_value, (int, float)):
-            token_value = str(token_value)
+def eval_token(token: Token, data: Union[str, dict]) -> str:
+    value = get_value(token.key, data)
+    if not value:
+        value = ''
+    if isinstance(value, (int, float)):
+        value = str(value)
+    if is_html_escape(token.match):
+        value = html.escape(value)
+    return value
 
-        # * escape html characters
-        if is_html_escape(token_match):
-            token_value = html.escape(token_value)
 
-        tokens.append(
-            Token(key=token_match, value=token_value)
-        )
-
-    for token in tokens:
-        yield token
+def eval_template(template: str, token: Token, data: Union[str, dict]) -> str:
+    value = eval_token(token, data)
+    return template.replace(token.match, value)
